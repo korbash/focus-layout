@@ -14,7 +14,9 @@
 </aside>
 <section class="stage" aria-label="Interactive graph">
   <div class="stage-header"><div class="breadcrumbs">Example workspace <span>/</span> <strong id="focus-name">Document</strong></div><button id="back" disabled>← Back</button></div>
-  <svg id="graph" role="group" aria-label="Relationship graph" tabindex="0"><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L8,4 L0,8" fill="#819493"/></marker></defs><g id="world"><g id="edges"></g><g id="labels"></g><g id="nodes"></g></g></svg>
+  <div class="direction-toolbar" role="group" aria-label="Graph directions"><button id="show-in" title="Incoming connections from other nodes; self-loops excluded" aria-pressed="false">← Incoming <span id="incoming-count"></span></button><button id="show-out" title="Outgoing connections to other nodes; self-loops excluded" class="selected" aria-pressed="true">Outgoing → <span id="outgoing-count"></span></button><button id="show-both" aria-pressed="false">↔ Both</button></div>
+  <div id="direction-hint" class="direction-hint" hidden><span id="direction-hint-text"></span><button id="reveal-incoming">Show incoming connections</button></div>
+  <svg id="graph" role="group" aria-label="Relationship graph" tabindex="0"><defs></defs><g id="world"><g id="edges"></g><g id="labels"></g><g id="nodes"></g></g></svg>
   <div class="canvas-help">Click a node to refocus <span>·</span> Click a connection to inspect <span>·</span> Drag background to pan</div>
   <div class="canvas-footer"><span id="stats" role="status">Preparing graph…</span><div class="zoom"><button id="zoom-out" aria-label="Zoom out">−</button><button id="fit">Fit</button><button id="zoom-in" aria-label="Zoom in">+</button></div></div>
   <div id="error" role="alert" hidden></div>

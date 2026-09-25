@@ -1,4 +1,5 @@
-import { createExplorer, type Frame, type Graph, type LayoutOptions, type Point, type PositionedNode } from '../src/index';
+import { edgeRoute } from './routing';
+import { createExplorer, type Frame, type Graph, type LayoutOptions } from '../src/index';
 
 const nodeInfo: Record<string, { name: string; file: string; description: string }> = {
   document: { name: 'Document', file: 'content.ts', description: 'A shared piece of knowledge. Follow its author, topics, and revision history.' },
@@ -41,6 +42,11 @@ const element = (tag: string, attrs: Record<string, string> = {}) => {
   return node;
 };
 const text = (parent: Element, content: string, attrs: Record<string, string>) => { const t = element('text', attrs); t.textContent = content; parent.append(t); };
+for (const [file, color] of Object.entries(colors)) {
+  const marker = element('marker', { id: `arrow-${file.replace('.', '-')}`, viewBox: '0 0 12 12', markerWidth: '12', markerHeight: '12', refX: '11', refY: '6', orient: 'auto', markerUnits: 'userSpaceOnUse', overflow: 'visible' });
+  marker.append(element('path', { d: 'M1,1 L11,6 L1,11 L4,6 Z', fill: color }));
+  svg.querySelector('defs')!.append(marker);
+}
 const nodeElements = new Map<string, Element>(), edgeElements = new Map<string, Element>(), labelElements = new Map<string, Element>();
 let frame: Frame = { focus: '', nodes: [], edges: [], omitted: 0 };
 let focus = 'document', depth = 2, zoom = 1, fitted = 1, pan = { x: 0, y: 0 };
@@ -65,12 +71,6 @@ function details(id: string, edge = false) {
   $('detail-file').textContent = connection ? connection[3] : info.file;
   $('detail-type-label').textContent = connection ? 'Signature' : 'Connections';
   $('detail-type').textContent = connection ? `${nodeInfo[connection[1]]!.name} → ${nodeInfo[connection[2]]!.name}` : `${graph.edges.filter(e => e.source === id).length} outgoing · ${graph.edges.filter(e => e.target === id).length} incoming`;
-}
-// Edge rendering deliberately belongs to this demo, not the layout library.
-function boundary(a: PositionedNode, b: Point) {
-  const dx = b.x - a.x, dy = b.y - a.y;
-  const scale = Math.min(a.width / 2 / (Math.abs(dx) || .001), a.height / 2 / (Math.abs(dy) || .001));
-  return { x: a.x + dx * scale, y: a.y + dy * scale };
 }
 function draw(next: Frame) {
   frame = next;
@@ -98,14 +98,15 @@ function draw(next: Frame) {
     const label = e.labelPosition || { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     const info = connections.find(c => c[0] === e.id)!;
     let path = edgeElements.get(e.id);
-    if (!path) { path = element('path', { class: 'edge-path', stroke: colors[info[3]]!, 'data-edge': e.id }); document.getElementById('edges')!.append(path); edgeElements.set(e.id, path); }
-    const from = boundary(a, label), to = boundary(b, label);
-    // Two quadratic spans pass through the reserved label; separate tangents preserve loops.
-    if (e.source === e.target) {
-      path.setAttribute('d', `M${a.x + a.width / 2},${a.y - 12} C${label.x},${a.y - 90} ${label.x + 80},${label.y - 50} ${label.x},${label.y} C${label.x - 80},${label.y + 70} ${a.x},${label.y + 90} ${a.x},${a.y - a.height / 2}`);
-    } else {
-      path.setAttribute('d', `M${from.x},${from.y} Q${(from.x + label.x) / 2},${from.y} ${label.x},${label.y} Q${(label.x + to.x) / 2},${to.y} ${to.x},${to.y}`);
+    if (!path) {
+      path = element('g', { 'data-edge': e.id, 'data-target': e.target });
+      path.append(element('path', { class: 'edge-path', stroke: colors[info[3]]! }));
+      path.append(element('path', { class: 'edge-path edge-target', stroke: colors[info[3]]!, 'marker-end': `url(#arrow-${info[3].replace('.', '-')})` }));
+      document.getElementById('edges')!.append(path); edgeElements.set(e.id, path);
     }
+    const route = edgeRoute(a, b, { ...label, ...(e.label || { width: 1, height: 1 }) }, e.source === e.target);
+    path.children[0]!.setAttribute('d', route.before);
+    path.children[1]!.setAttribute('d', route.after);
     path.setAttribute('opacity', String(e.opacity));
     let el = labelElements.get(e.id);
     if (!el) {
@@ -137,12 +138,36 @@ async function refocus(id: string, push = true) {
   if (push && focus !== id) history.push(focus);
   focus = id; jump.value = id; $('focus-name').textContent = nodeInfo[id]!.name;
   $('back').toggleAttribute('disabled', !history.length); details(id);
-  $('api-call').textContent = `explorer.focus('${id}', {\n  depth: ${depth}\n})`;
+  updateDirectionControls();
+  $('api-call').textContent = `explorer.focus('${id}', {\n  depth: ${depth},\n  direction: '${$<HTMLSelectElement>('direction').value}'\n})`;
   $('error').hidden = true; svg.dataset.state = 'moving';
   const options: LayoutOptions = { linkDistance: 95, gap: 22, depth, direction: ($<HTMLSelectElement>('direction').value as 'out'), flow: ($<HTMLSelectElement>('flow').value as 'free'), edgeIds: connections.filter(c => enabled.has(c[3])).map(c => c[0]) };
   try { await explorer.focus(id, options); if (version === generation) svg.dataset.state = 'settled'; }
   catch (e) { $('error').textContent = String(e); $('error').hidden = false; svg.dataset.state = 'error'; }
 }
+function updateDirectionControls() {
+  const direction = $<HTMLSelectElement>('direction').value;
+  const incoming = connections.filter(e => enabled.has(e[3]) && e[2] === focus && e[1] !== focus).length;
+  const outgoing = connections.filter(e => enabled.has(e[3]) && e[1] === focus && e[2] !== focus).length;
+  for (const mode of ['in', 'out', 'both']) {
+    const button = $<HTMLButtonElement>(`show-${mode}`);
+    button.setAttribute('aria-pressed', String(mode === direction));
+    button.classList.toggle('selected', mode === direction);
+  }
+  $('incoming-count').textContent = String(incoming);
+  $('outgoing-count').textContent = String(outgoing);
+  const message = $('direction-hint');
+  message.hidden = !(direction === 'out' && incoming > 0);
+  $('direction-hint-text').textContent = outgoing === 0
+    ? `No outgoing connections to other nodes. ${incoming} incoming ${incoming === 1 ? 'connection is' : 'connections are'} outside this view.`
+    : `${incoming} incoming ${incoming === 1 ? 'connection' : 'connections'} to this node. Explore both directions to see more context.`;
+}
+function chooseDirection(mode: string) {
+  $<HTMLSelectElement>('direction').value = mode;
+  void refocus(focus, false);
+}
+for (const mode of ['in', 'out', 'both']) $(`show-${mode}`).onclick = () => chooseDirection(mode);
+$('reveal-incoming').onclick = () => chooseDirection('both');
 jump.onchange = () => void refocus(jump.value);
 $('back').onclick = () => { const id = history.pop(); if (id) void refocus(id, false); };
 $('depth').onclick = e => { const button = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-depth]'); if (!button) return; depth = Number(button.dataset.depth); $('depth').querySelectorAll('button').forEach(b => b.classList.toggle('selected', b === button)); void refocus(focus, false); };

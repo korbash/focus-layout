@@ -77,7 +77,10 @@ and `opacity`. Edges include their original endpoints, label dimensions/position
 Entering/exiting entities fade; both endpoints of every transitional edge remain in its frame.
 Keep display metadata keyed by IDs in your host, including exiting entities until animation completes.
 
-Edges are **not routed by this package**. The demo draws simple curved connections from these positions.
+Edges are **not routed by this package**. The demo draws curved connections through separate
+node and label ports, with arrowheads stopping before the target card, including self-loops.
+Its direction toolbar shows incoming/outgoing connection counts and can reveal incoming neighbours
+when an outgoing-only view leaves the focused node isolated.
 Your renderer decides ports, arrowheads, line styles, label content, hit areas, and routing.
 
 ### Independent primitives
