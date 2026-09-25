@@ -18,6 +18,7 @@ npm run dev
 Click nodes to refocus, inspect connections, follow incoming/outgoing links, change depth, filter files,
 and go back. The synthetic example includes cycles, self-loops, and two different edges with the same
 endpoints. No external accounts, fonts, services, or data are required.
+Wheel and trackpad pinch zoom around the cursor, keeping the graph point beneath it fixed even after panning.
 
 ## Use the library
 

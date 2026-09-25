@@ -187,6 +187,19 @@ let drag: { x: number; y: number } | undefined;
 svg.addEventListener('pointerdown', e => { if ((e.target as Element).closest('.node,.edge-label')) return; drag = { x: e.clientX, y: e.clientY }; svg.setPointerCapture(e.pointerId); });
 svg.addEventListener('pointermove', e => { if (!drag) return; pan.x += e.clientX - drag.x; pan.y += e.clientY - drag.y; drag = { x: e.clientX, y: e.clientY }; camera(); });
 svg.addEventListener('pointerup', () => { drag = undefined; }); svg.addEventListener('pointercancel', () => { drag = undefined; });
-svg.addEventListener('wheel', e => { e.preventDefault(); zoom = Math.max(.3, Math.min(3, zoom * Math.exp(-e.deltaY * .001))); camera(); }, { passive: false });
+svg.addEventListener('wheel', e => {
+  e.preventDefault();
+  const bounds = svg.getBoundingClientRect();
+  const delta = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? bounds.height : 1);
+  const nextZoom = Math.max(.3, Math.min(3, zoom * Math.exp(-delta * .001)));
+  const ratio = nextZoom / zoom;
+  const x = e.clientX - bounds.left - bounds.width / 2;
+  const y = e.clientY - bounds.top - bounds.height / 2;
+  // Keep the world point beneath the cursor fixed, including after panning and at zoom limits.
+  pan.x = x - (x - pan.x) * ratio;
+  pan.y = y - (y - pan.y) * ratio;
+  zoom = nextZoom;
+  camera();
+}, { passive: false });
 new ResizeObserver(camera).observe(svg);
 void refocus(focus, false);

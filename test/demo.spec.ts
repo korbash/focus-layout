@@ -1,5 +1,53 @@
 import { test, expect } from '@playwright/test';
 
+test('wheel and trackpad pinch keep the graph point under the cursor fixed, including after panning and at limits', async ({ page }) => {
+  await page.goto('/');
+  const canvas = page.locator('#graph');
+  await expect(canvas).toHaveAttribute('data-state', 'settled');
+  const bounds = (await canvas.boundingBox())!;
+  const cursor = { x: Math.round(bounds.x + bounds.width * .28), y: Math.round(bounds.y + bounds.height * .36) };
+  const world = page.locator('#world');
+  const zoomAtCursor = async (delta: number, pinch = false) => {
+    const before = await world.evaluate((el, cursor) => {
+      const matrix = (el as SVGGraphicsElement).getScreenCTM()!;
+      const point = new DOMPoint(cursor.x, cursor.y).matrixTransform(matrix.inverse());
+      return { x: point.x, y: point.y, scale: matrix.a };
+    }, cursor);
+    await page.mouse.move(cursor.x, cursor.y);
+    if (pinch) await page.keyboard.down('Control');
+    try { await page.mouse.wheel(0, delta); }
+    finally { if (pinch) await page.keyboard.up('Control'); }
+    // Wheel delivery is asynchronous. Wait for an actual scale change before checking the anchor.
+    await expect.poll(() => world.evaluate(el => (el as SVGGraphicsElement).getScreenCTM()!.a)).not.toBe(before.scale);
+    const after = await world.evaluate((el, point) => {
+      const matrix = (el as SVGGraphicsElement).getScreenCTM()!;
+      const screen = new DOMPoint(point.x, point.y).matrixTransform(matrix);
+      return { x: screen.x, y: screen.y, scale: matrix.a };
+    }, before);
+    expect(after.x).toBeCloseTo(cursor.x, 3);
+    expect(after.y).toBeCloseTo(cursor.y, 3);
+    expect(delta < 0 ? after.scale > before.scale : after.scale < before.scale).toBe(true);
+  };
+  await zoomAtCursor(-180, true);
+  await zoomAtCursor(100);
+  // Pan from empty canvas, then verify the same invariant with a nonzero translation.
+  await page.mouse.move(bounds.x + 40, bounds.y + 220);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + 100, bounds.y + 270);
+  await page.mouse.up();
+  await zoomAtCursor(-200, true);
+  await zoomAtCursor(-100000, true); // Clamp to the upper zoom limit.
+  const atLimit = await world.getAttribute('transform');
+  const clampedEvent = canvas.evaluate(el => new Promise<void>(resolve => {
+    el.addEventListener('wheel', () => requestAnimationFrame(() => resolve()), { once: true });
+  }));
+  await page.mouse.wheel(0, -500);
+  await clampedEvent;
+  expect(await world.getAttribute('transform')).toBe(atLimit);
+  await zoomAtCursor(100000, true); // Clamp to the lower limit.
+  expect(await world.getAttribute('transform')).not.toBe(atLimit);
+});
+
 test('measured cards fit their text and keep room between mixed widths and heights', async ({ page }) => {
   await page.goto('/');
   const canvas = page.locator('#graph');
