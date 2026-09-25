@@ -1,3 +1,4 @@
+import { measureCard, type Card } from './cards';
 import { edgeRoute } from './routing';
 import { createExplorer, type Frame, type Graph, type LayoutOptions } from '../src/index';
 
@@ -28,10 +29,6 @@ const connections = [
   ['featured', 'workspace', 'document', 'content.ts', 'The featured document of a workspace.'],
   ['related', 'topic', 'topic', 'content.ts', 'Topics can refer to other topics.'],
 ] as const;
-const graph: Graph = {
-  nodes: Object.keys(nodeInfo).map(id => ({ id, width: 122, height: 64 })),
-  edges: connections.map(([id, source, target]) => ({ id, source, target, label: { width: 142, height: 44 } })),
-};
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const svg = document.getElementById('graph') as unknown as SVGSVGElement;
 const world = document.getElementById('world')!;
@@ -41,7 +38,22 @@ const element = (tag: string, attrs: Record<string, string> = {}) => {
   for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
   return node;
 };
-const text = (parent: Element, content: string, attrs: Record<string, string>) => { const t = element('text', attrs); t.textContent = content; parent.append(t); };
+// Sample richer metrics exercise wrapping and different card heights.
+const descriptions: Record<string, string> = {
+  reviewer: 'Assigned reviewer before publication.',
+  revision: 'Latest saved version, including unpublished changes.',
+  mentor: 'Optional link to another person.',
+};
+await document.fonts.ready;
+const nodeCards = new Map(Object.entries(nodeInfo).map(([id, info]) => [id, measureCard(svg, 'node', info.name, 'DIMENSION')]));
+const edgeCards = new Map<string, Card>(connections.map(([id, source, target, file]) => [id, measureCard(svg, 'edge-label', id, `${nodeInfo[source]!.name} → ${nodeInfo[target]!.name}`, colors[file], descriptions[id])]));
+const graph: Graph = {
+  nodes: [...nodeCards].map(([id, { width, height }]) => ({ id, width, height })),
+  edges: connections.map(([id, source, target]) => {
+    const { width, height } = edgeCards.get(id)!;
+    return { id, source, target, label: { width, height } };
+  }),
+};
 for (const [file, color] of Object.entries(colors)) {
   const marker = element('marker', { id: `arrow-${file.replace('.', '-')}`, viewBox: '0 0 12 12', markerWidth: '12', markerHeight: '12', refX: '11', refY: '6', orient: 'auto', markerUnits: 'userSpaceOnUse', overflow: 'visible' });
   marker.append(element('path', { d: 'M1,1 L11,6 L1,11 L4,6 Z', fill: color }));
@@ -82,9 +94,8 @@ function draw(next: Frame) {
     let el = nodeElements.get(n.id);
     if (!el) {
       el = element('g', { role: 'button', tabindex: '0', 'aria-label': `Focus ${nodeInfo[n.id]!.name}`, 'data-node': n.id });
-      el.append(element('rect', { class: 'surface', rx: '18', x: '-61', y: '-32', width: '122', height: '64' }));
-      text(el, 'DIMENSION', { class: 'node-category', 'text-anchor': 'middle', y: '-9' });
-      text(el, nodeInfo[n.id]!.name, { 'text-anchor': 'middle', y: '13' });
+      el.append(element('rect', { class: 'surface', rx: '18', x: String(-n.width / 2), y: String(-n.height / 2), width: String(n.width), height: String(n.height) }));
+      el.append(nodeCards.get(n.id)!.content.cloneNode(true));
       el.addEventListener('click', () => void refocus(n.id));
       el.addEventListener('keydown', (event: Event) => { const e = event as KeyboardEvent; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void refocus(n.id); } });
       document.getElementById('nodes')!.append(el); nodeElements.set(n.id, el);
@@ -110,11 +121,9 @@ function draw(next: Frame) {
     path.setAttribute('opacity', String(e.opacity));
     let el = labelElements.get(e.id);
     if (!el) {
-      el = element('g', { class: 'edge-label', role: 'button', tabindex: '0', 'aria-label': `Inspect ${e.id}`, 'data-label': e.id });
+      el = element('g', { class: 'edge-label', role: 'button', tabindex: '0', 'aria-label': `Inspect ${e.id}`, 'data-label': e.id, 'data-width': String(e.label!.width), 'data-height': String(e.label!.height) });
       el.append(element('path', { class: 'edge-surface', stroke: colors[info[3]]! }));
-      el.append(element('circle', { class: 'dot', cx: '-56', cy: '-6', r: '3', fill: colors[info[3]]! }));
-      text(el, e.id, { class: 'edge-name', x: '-46', y: '-2' });
-      text(el, `${nodeInfo[e.source]!.name} → ${nodeInfo[e.target]!.name}`, { class: 'edge-type', x: '-56', y: '12' });
+      el.append(edgeCards.get(e.id)!.content.cloneNode(true));
       el.addEventListener('click', () => details(e.id, true));
       el.addEventListener('keydown', (event: Event) => { const k = event as KeyboardEvent; if (k.key === 'Enter') details(e.id, true); });
       document.getElementById('labels')!.append(el); labelElements.set(e.id, el);
@@ -142,7 +151,7 @@ async function refocus(id: string, push = true) {
   updateDirectionControls();
   $('api-call').textContent = `explorer.focus('${id}', {\n  depth: ${depth},\n  direction: '${$<HTMLSelectElement>('direction').value}'\n})`;
   $('error').hidden = true; svg.dataset.state = 'moving';
-  const options: LayoutOptions = { linkDistance: 95, gap: 22, depth, direction: ($<HTMLSelectElement>('direction').value as 'out'), flow: ($<HTMLSelectElement>('flow').value as 'free'), edgeIds: connections.filter(c => enabled.has(c[3])).map(c => c[0]) };
+  const options: LayoutOptions = { linkDistance: 120, gap: 40, depth, direction: ($<HTMLSelectElement>('direction').value as 'out'), flow: ($<HTMLSelectElement>('flow').value as 'free'), edgeIds: connections.filter(c => enabled.has(c[3])).map(c => c[0]) };
   try { await explorer.focus(id, options); if (version === generation) svg.dataset.state = 'settled'; }
   catch (e) { $('error').textContent = String(e); $('error').hidden = false; svg.dataset.state = 'error'; }
 }

@@ -80,6 +80,11 @@ Keep display metadata keyed by IDs in your host, including exiting entities unti
 Edges are **not routed by this package**. The demo draws curved connections through separate
 node and label ports, with arrowheads stopping just before the target card, including self-loops.
 Labels have a continuous outline that tapers locally into the connecting lines.
+Facing ports are selected together from the free space between boxes; curve handles shrink with
+that space so short links don't double back. This is local routing, not obstacle avoidance.
+The playground measures SVG text after fonts load and passes the resulting card sizes to the solver.
+Short labels shrink to their content; selected metrics include wrapped descriptions to demonstrate
+different heights. The demo uses a 40-unit card gap, leaving room for the tapered label ends.
 Its direction toolbar shows incoming/outgoing connection counts and can reveal incoming neighbours
 when an outgoing-only view leaves the focused node isolated.
 Your renderer decides ports, arrowheads, line styles, label content, hit areas, and routing.

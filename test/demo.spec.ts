@@ -1,4 +1,47 @@
 import { test, expect } from '@playwright/test';
+
+test('measured cards fit their text and keep room between mixed widths and heights', async ({ page }) => {
+  await page.goto('/');
+  const canvas = page.locator('#graph');
+  const checkCards = async () => {
+    await expect(canvas).toHaveAttribute('data-state', 'settled');
+    const cards = await page.locator('[data-node], [data-label]').evaluateAll(elements => elements.map(el => {
+      const group = el as SVGGElement;
+      const rect = group.querySelector('rect') as SVGRectElement | null;
+      const width = rect ? rect.width.baseVal.value : Number(group.dataset.width);
+      const height = rect ? rect.height.baseVal.value : Number(group.dataset.height);
+      const content = group.querySelector('.card-content') as SVGGElement;
+      const bounds = content.getBBox();
+      const relative = group.getCTM()!.inverse().multiply(content.getCTM()!);
+      const topLeft = new DOMPoint(bounds.x, bounds.y).matrixTransform(relative);
+      const bottomRight = new DOMPoint(bounds.x + bounds.width, bounds.y + bounds.height).matrixTransform(relative);
+      const position = group.transform.baseVal.consolidate()!.matrix;
+      return { id: group.dataset.node || group.dataset.label, label: !!group.dataset.label, width, height, x: position.e, y: position.f, left: topLeft.x, top: topLeft.y, right: bottomRight.x, bottom: bottomRight.y };
+    }));
+    expect(new Set(cards.filter(c => c.label).map(c => c.width)).size).toBeGreaterThan(2);
+    expect(new Set(cards.filter(c => c.label).map(c => c.height)).size).toBeGreaterThan(1);
+    // SVG glyph bounds can vary slightly with the final camera scale (font hinting).
+    for (const card of cards) {
+      expect(card.left, `${card.id} left padding`).toBeGreaterThanOrEqual(-card.width / 2 + 10);
+      expect(card.right, `${card.id} right padding`).toBeLessThanOrEqual(card.width / 2 - 10);
+      expect(card.top, `${card.id} top padding`).toBeGreaterThanOrEqual(-card.height / 2 + 10);
+      expect(card.bottom, `${card.id} bottom padding`).toBeLessThanOrEqual(card.height / 2 - 10);
+      if (card.label) expect(card.width - (card.right - card.left)).toBeLessThan(34);
+    }
+    for (let i = 0; i < cards.length; i++) for (let j = i + 1; j < cards.length; j++) {
+      const a = cards[i]!, b = cards[j]!;
+      const gap = Math.max(Math.abs(a.x - b.x) - (a.width + b.width) / 2, Math.abs(a.y - b.y) - (a.height + b.height) / 2);
+      expect(gap, `${a.id}/${b.id} card clearance`).toBeGreaterThanOrEqual(39.5);
+    }
+  };
+  await checkCards();
+  await page.getByLabel('Jump to a node').selectOption('person');
+  await page.getByLabel('Follow connections').selectOption('both');
+  await checkCards();
+  await page.getByLabel('Arrangement').selectOption('vertical');
+  await checkCards();
+});
+
 test('exploration, rich edges, filters, interruption, history and keyboard', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
