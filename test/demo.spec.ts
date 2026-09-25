@@ -45,6 +45,14 @@ test('Topic explains outgoing-only view, reveals incoming, and arrow tips stay c
     const routes = await page.locator('[data-edge]').evaluateAll(groups => groups.map(group => {
       const path = group.querySelector('.edge-target') as SVGPathElement;
       const rect = document.querySelector(`[data-node="${group.getAttribute('data-target')}"] rect`) as SVGRectElement;
+      const surface = document.querySelector(`[data-label="${group.getAttribute('data-edge')}"] .edge-surface`) as SVGPathElement;
+      const incoming = group.querySelector('.edge-path') as SVGPathElement;
+      const touchesSurface = (line: SVGPathElement, position: number) => {
+        const p = line.getPointAtLength(position);
+        const local = new DOMPoint(p.x, p.y).matrixTransform(line.getCTM()!).matrixTransform(surface.getCTM()!.inverse());
+        return surface.isPointInStroke(local);
+      };
+      const joined = touchesSurface(incoming, incoming.getTotalLength()) && touchesSurface(path, 0);
       const size = rect.getBBox();
       const length = path.getTotalLength();
       const local = (distance: number) => {
@@ -53,11 +61,12 @@ test('Topic explains outgoing-only view, reveals incoming, and arrow tips stay c
       };
       const end = local(length), before = local(Math.max(0, length - 1));
       const distance = (p: DOMPoint) => Math.hypot(Math.max(size.x - p.x, 0, p.x - size.x - size.width), Math.max(size.y - p.y, 0, p.y - size.y - size.height));
-      return { id: group.getAttribute('data-edge'), gap: distance(end), approachGap: distance(before), marker: path.getAttribute('marker-end') };
+      return { id: group.getAttribute('data-edge'), joined, gap: distance(end), approachGap: distance(before), marker: path.getAttribute('marker-end') };
     }));
     expect(routes.length).toBeGreaterThan(0);
     for (const route of routes) {
-      expect(route.gap, `${route.id} tip clearance`).toBeCloseTo(9, 1);
+      expect(route.joined, `${route.id} line must meet both label necks`).toBe(true);
+      expect(route.gap, `${route.id} tip clearance`).toBeCloseTo(2.5, 1);
       expect(route.approachGap, `${route.id} must approach from outside`).toBeGreaterThan(route.gap);
       expect(route.marker).toMatch(/^url\(#arrow-/);
     }

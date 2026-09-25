@@ -111,7 +111,7 @@ function draw(next: Frame) {
     let el = labelElements.get(e.id);
     if (!el) {
       el = element('g', { class: 'edge-label', role: 'button', tabindex: '0', 'aria-label': `Inspect ${e.id}`, 'data-label': e.id });
-      el.append(element('rect', { x: '-71', y: '-22', width: '142', height: '44', rx: '8' }));
+      el.append(element('path', { class: 'edge-surface', stroke: colors[info[3]]! }));
       el.append(element('circle', { class: 'dot', cx: '-56', cy: '-6', r: '3', fill: colors[info[3]]! }));
       text(el, e.id, { class: 'edge-name', x: '-46', y: '-2' });
       text(el, `${nodeInfo[e.source]!.name} → ${nodeInfo[e.target]!.name}`, { class: 'edge-type', x: '-56', y: '12' });
@@ -119,6 +119,7 @@ function draw(next: Frame) {
       el.addEventListener('keydown', (event: Event) => { const k = event as KeyboardEvent; if (k.key === 'Enter') details(e.id, true); });
       document.getElementById('labels')!.append(el); labelElements.set(e.id, el);
     }
+    el.querySelector('.edge-surface')!.setAttribute('d', route.surface);
     el.setAttribute('transform', `translate(${label.x},${label.y})`); el.setAttribute('opacity', String(e.opacity));
   }
   camera();

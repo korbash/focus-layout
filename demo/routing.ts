@@ -20,10 +20,46 @@ function span(a: Port, b: Port, startGap: number, endGap: number): string {
   return `M${start.x},${start.y} C${start.x + a.nx * handle},${start.y + a.ny * handle} ${end.x + b.nx * handle},${end.y + b.ny * handle} ${end.x},${end.y}`;
 }
 
-/** Demo renderer geometry, not a general obstacle router. The target tip has a 9px clearance. */
-export function edgeRoute(source: Box, target: Box, label: Box, loop: boolean): { before: string; after: string } {
+const neckLength = 10;
+
+// A single outline, including the two small necks: no rectangle seam across the line.
+function labelOutline(box: Box, ports: Port[]): string {
+  const w = box.width / 2, h = box.height / 2, radius = 8;
+  const sides = [
+    { x: -w, y: -h, tx: 1, ty: 0, nx: 0, ny: -1, length: box.width },
+    { x: w, y: -h, tx: 0, ty: 1, nx: 1, ny: 0, length: box.height },
+    { x: w, y: h, tx: -1, ty: 0, nx: 0, ny: 1, length: box.width },
+    { x: -w, y: h, tx: 0, ty: -1, nx: -1, ny: 0, length: box.height },
+  ];
+  let d = `M${-w + radius},${-h}`;
+  for (let i = 0; i < sides.length; i++) {
+    const side = sides[i]!;
+    const at = (t: number, outward = 0) => `${side.x + side.tx * t + side.nx * outward},${side.y + side.ty * t + side.ny * outward}`;
+    const positions = ports.filter(p => p.nx === side.nx && p.ny === side.ny)
+      .map(p => (p.x - box.x - side.x) * side.tx + (p.y - box.y - side.y) * side.ty).sort((a, b) => a - b);
+    for (const t of positions) {
+      d += ` L${at(t - 6)} C${at(t - 2)},${at(t - .4, neckLength - 4)},${at(t - .4, neckLength)}`;
+      d += ` L${at(t + .4, neckLength)} C${at(t + .4, neckLength - 4)},${at(t + 2)},${at(t + 6)}`;
+    }
+    const next = sides[(i + 1) % sides.length]!;
+    d += ` L${at(side.length - radius)} Q${at(side.length)} ${next.x + next.tx * radius},${next.y + next.ty * radius}`;
+  }
+  return d + ' Z';
+}
+
+/** Demo renderer geometry, not a general obstacle router. */
+export function edgeRoute(source: Box, target: Box, label: Box, loop: boolean): { before: string; after: string; surface: string } {
+  let entry = port(label, source), exit = port(label, target);
+  if (entry.nx === exit.nx && entry.ny === exit.ny) {
+    // Keep both necks distinct even when both ends are on the same side (including loops).
+    const verticalSide = entry.nx !== 0;
+    const offset = Math.min(24, (verticalSide ? label.height : label.width) / 2 - 14);
+    entry = { ...entry, x: entry.x - (verticalSide ? 0 : offset), y: entry.y - (verticalSide ? offset : 0) };
+    exit = { ...exit, x: exit.x + (verticalSide ? 0 : offset), y: exit.y + (verticalSide ? offset : 0) };
+  }
   return {
-    before: span(port(source, label, loop ? -.7 : 0), port(label, source, loop ? -.7 : 0), 3, 2),
-    after: span(port(label, target, loop ? .7 : 0), port(target, label, loop ? .7 : 0), 2, 9),
+    before: span(port(source, label, loop ? -.7 : 0), entry, 1.5, neckLength),
+    after: span(exit, port(target, label, loop ? .7 : 0), neckLength, 2.5),
+    surface: labelOutline(label, [entry, exit]),
   };
 }
