@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { edgeRoute, routeEdges } from '../demo/routing';
+import { edgeRoute, routeEdges } from '../src/svg-routing';
 import type { PositionedNode, PositionedEdge } from '../src/types';
 
 test('incoming, outgoing and loop ports repel together, with stable ordering and bounded crowded sides', () => {

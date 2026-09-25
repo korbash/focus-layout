@@ -1,4 +1,4 @@
-import type { Point, Size, PositionedNode, PositionedEdge } from '../src/types';
+import type { Point, Size, PositionedNode, PositionedEdge } from './types.js';
 
 type Box = Point & Size;
 type Port = Point & { nx: number; ny: number };

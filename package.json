@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./svg": {
+      "types": "./dist/svg-routing.d.ts",
+      "import": "./dist/svg-routing.js"
     }
   },
   "files": [

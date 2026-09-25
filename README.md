@@ -78,7 +78,9 @@ and `opacity`. Edges include their original endpoints, label dimensions/position
 Entering/exiting entities fade; both endpoints of every transitional edge remain in its frame.
 Keep display metadata keyed by IDs in your host, including exiting entities until animation completes.
 
-Edges are **not routed by this package**. The demo draws curved connections through separate
+The core returns positions only. The optional `@korbash/focus-layout/svg` export provides
+`routeEdges(nodes, edges)` for SVG renderers; Angular and the playground share this geometry.
+It draws curved connections through separate
 node and label ports, with arrowheads stopping just before the target card, including self-loops.
 Labels have a continuous outline that tapers locally into the connecting lines.
 Short straight joins connect the curves to the label necks and arrowheads. Arrowheads are separate

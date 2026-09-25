@@ -1,5 +1,5 @@
 import { measureCard, type Card } from './cards';
-import { routeEdges } from './routing';
+import { routeEdges } from '../src/svg-routing';
 import { createExplorer, type Frame, type Graph, type LayoutOptions } from '../src/index';
 
 const nodeInfo: Record<string, { name: string; file: string; description: string }> = {
