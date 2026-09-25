@@ -1,5 +1,24 @@
 import { test, expect } from '@playwright/test';
 
+test('reselecting the focused node preserves all geometry and the zoomed camera', async ({ page }) => {
+  await page.goto('/');
+  const canvas = page.locator('#graph'), world = page.locator('#world');
+  await expect(canvas).toHaveAttribute('data-state', 'settled');
+  const bounds = (await canvas.boundingBox())!;
+  await page.mouse.move(bounds.x + 150, bounds.y + 250);
+  const initialCamera = await world.getAttribute('transform');
+  await page.mouse.wheel(0, -200);
+  await expect(world).not.toHaveAttribute('transform', initialCamera!);
+  const geometry = await world.innerHTML(), camera = await world.getAttribute('transform');
+  const focused = page.getByRole('button', { name: 'Focus Document', exact: true });
+  await focused.click();
+  await expect(canvas).toHaveAttribute('data-state', 'settled');
+  await focused.press('Enter');
+  await expect(canvas).toHaveAttribute('data-state', 'settled');
+  expect(await world.innerHTML()).toBe(geometry);
+  expect(await world.getAttribute('transform')).toBe(camera);
+});
+
 test('wheel and trackpad pinch keep the graph point under the cursor fixed, including after panning and at limits', async ({ page }) => {
   await page.goto('/');
   const canvas = page.locator('#graph');

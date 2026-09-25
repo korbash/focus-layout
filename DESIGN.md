@@ -59,6 +59,11 @@ origin. Existing centres initialise the next calculation; newly revealed nodes s
 adjacent node or near the focus, with deterministic angular offsets. This is a warm start, not a
 formal minimal-displacement guarantee. The host may fit or pan its camera independently.
 
+An unchanged focus request is idempotent: it reuses the current settled geometry, or joins an identical
+in-flight request without restarting its timer. Only the current request is reused, not a history of
+layouts. Effective layout defaults and edge allowlist membership determine equivalence. Graph
+replacement, explicit cancellation, and failures invalidate reuse, avoiding solver drift on repeated clicks.
+
 The controller has one active generation. A new intent cancels its scheduled frame and aborts any
 pending async engine. Each response checks its generation before publication. A new transition starts
 from the last published geometry including opacity, even if an older one was halfway done. Reentrant

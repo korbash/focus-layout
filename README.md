@@ -130,6 +130,11 @@ const halfway = transitionFrame(current, next, 0.5);
 | `duration` | `450` ms | Controller option or per-focus override; `0` disables animation |
 
 Per-focus layout options persist for the next focus. Pass `edgeIds: undefined` to reset the allowlist.
+Repeating `focus(id)` with the same effective layout options preserves the settled frame without
+running the solver or publishing another frame. If that request is still running, callers share its
+completion; a repeated click does not restart animation, even with a different `duration`.
+Changes to focus, layout options, or the graph trigger a new calculation. `cancel()` and `setGraph()`
+invalidate reuse; failed requests can be retried. Returned results remain independent copies.
 Filters only affect display; they never modify the original graph or semantic resolution in the host.
 `omitted` counts eligible nodes beyond `maxNodes`, not beyond `depth`.
 The solver refuses more than 400 boxes (nodes plus labels) rather than freezing on an unbounded graph.

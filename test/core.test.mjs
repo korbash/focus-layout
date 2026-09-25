@@ -73,6 +73,56 @@ function manualClock() {
   };
 }
 const flush = async () => { for (let i = 0; i < 5; i++) await Promise.resolve(); };
+test('identical focus reuses the settled frame but changed settings and graph invalidate it', async () => {
+  let calls = 0, publishes = 0;
+  const explorer = createExplorer(graph, { duration: 0, onFrame: () => publishes++, engine: req => { calls++; return layoutFocus(req); } });
+  const edgeIds = graph.edges.map(e => e.id);
+  const first = await explorer.focus('a', { edgeIds });
+  const repeated = await explorer.focus('a', { edgeIds: [...edgeIds].reverse(), depth: 2, direction: 'out', duration: 200 });
+  assert.equal(calls, 1); assert.equal(publishes, 1);
+  assert.deepEqual(repeated, first);
+  repeated.frame.nodes.length = 0;
+  assert.ok(explorer.snapshot().nodes.length > 0);
+  await explorer.focus('a', { depth: 1 }); assert.equal(calls, 2);
+  await explorer.focus('a', { edgeIds: [] }); assert.equal(calls, 3);
+  const changed = structuredClone(graph); changed.nodes[0].width += 40;
+  explorer.setGraph(changed);
+  await explorer.focus('a'); assert.equal(calls, 4);
+  assert.equal(explorer.snapshot().nodes[0].width, changed.nodes[0].width);
+});
+test('identical pending and animating focus shares the transition without cancelling or restarting it', async () => {
+  const clock = manualClock(); let calls = 0;
+  const explorer = createExplorer(graph, { clock, duration: 100, onFrame: () => {}, engine: req => { calls++; return layoutFocus(req); } });
+  const first = explorer.focus('a');
+  const pending = explorer.focus('a');
+  await flush(); clock.tick(40);
+  const midpoint = explorer.snapshot();
+  const animating = explorer.focus('a', { duration: 300 });
+  assert.deepEqual(explorer.snapshot(), midpoint);
+  assert.equal(clock.count(), 1); assert.equal(calls, 1);
+  clock.tick(60);
+  const results = await Promise.all([first, pending, animating]);
+  assert.ok(results.every(r => r.status === 'finished'));
+  assert.equal(clock.count(), 0);
+  results[0].frame.nodes.length = 0;
+  assert.ok(results[1].frame.nodes.length > 0);
+  const interrupted = explorer.focus('b');
+  const joined = explorer.focus('b'); await flush(); clock.tick(20);
+  explorer.cancel();
+  assert.equal((await interrupted).status, 'cancelled');
+  assert.equal((await joined).status, 'cancelled');
+  await explorer.focus('b', { duration: 0 }); assert.equal(calls, 3);
+});
+test('failed focus is retried instead of being reused', async () => {
+  let calls = 0;
+  const explorer = createExplorer(graph, { duration: 0, onFrame: () => {}, engine: req => {
+    if (++calls === 1) throw new Error('temporary');
+    return layoutFocus(req);
+  } });
+  await assert.rejects(explorer.focus('a'), /temporary/);
+  assert.equal((await explorer.focus('a')).status, 'finished');
+  assert.equal(calls, 2);
+});
 test('a click mid-transition cancels prior work and continues from the displayed frame', async () => {
   const clock = manualClock(), frames = [];
   const explorer = createExplorer(graph, { clock, duration: 100, onFrame: f => frames.push(f) });
