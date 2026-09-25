@@ -54,11 +54,6 @@ const graph: Graph = {
     return { id, source, target, label: { width, height } };
   }),
 };
-for (const [file, color] of Object.entries(colors)) {
-  const marker = element('marker', { id: `arrow-${file.replace('.', '-')}`, viewBox: '0 0 12 12', markerWidth: '12', markerHeight: '12', refX: '11', refY: '6', orient: 'auto', markerUnits: 'userSpaceOnUse', overflow: 'visible' });
-  marker.append(element('path', { d: 'M1,1 L11,6 L1,11 L4,6 Z', fill: color }));
-  svg.querySelector('defs')!.append(marker);
-}
 const nodeElements = new Map<string, Element>(), edgeElements = new Map<string, Element>(), labelElements = new Map<string, Element>();
 let frame: Frame = { focus: '', nodes: [], edges: [], omitted: 0 };
 let focus = 'document', depth = 2, zoom = 1, fitted = 1, pan = { x: 0, y: 0 };
@@ -112,12 +107,14 @@ function draw(next: Frame) {
     if (!path) {
       path = element('g', { 'data-edge': e.id, 'data-target': e.target });
       path.append(element('path', { class: 'edge-path', stroke: colors[info[3]]! }));
-      path.append(element('path', { class: 'edge-path edge-target', stroke: colors[info[3]]!, 'marker-end': `url(#arrow-${info[3].replace('.', '-')})` }));
+      path.append(element('path', { class: 'edge-path edge-target', stroke: colors[info[3]]! }));
+      path.append(element('path', { class: 'edge-arrow', fill: colors[info[3]]! }));
       document.getElementById('edges')!.append(path); edgeElements.set(e.id, path);
     }
     const route = edgeRoute(a, b, { ...label, ...(e.label || { width: 1, height: 1 }) }, e.source === e.target);
     path.children[0]!.setAttribute('d', route.before);
     path.children[1]!.setAttribute('d', route.after);
+    path.children[2]!.setAttribute('d', route.arrow);
     path.setAttribute('opacity', String(e.opacity));
     let el = labelElements.get(e.id);
     if (!el) {

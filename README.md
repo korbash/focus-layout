@@ -80,6 +80,8 @@ Keep display metadata keyed by IDs in your host, including exiting entities unti
 Edges are **not routed by this package**. The demo draws curved connections through separate
 node and label ports, with arrowheads stopping just before the target card, including self-loops.
 Labels have a continuous outline that tapers locally into the connecting lines.
+Short straight joins connect the curves to the label necks and arrowheads. Arrowheads are separate
+filled triangles; shafts end at their bases instead of continuing beneath them.
 Facing ports are selected together from the free space between boxes; curve handles shrink with
 that space so short links don't double back. This is local routing, not obstacle avoidance.
 The playground measures SVG text after fonts load and passes the resulting card sizes to the solver.

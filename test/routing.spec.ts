@@ -12,12 +12,12 @@ test('short links and differently proportioned cards never fold back between the
     const route = edgeRoute(source, target, label, source.x === target.x && source.y === target.y);
     for (const span of [route.before, route.after]) {
       const values = span.match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi)!.map(Number);
-      expect(values).toHaveLength(8);
-      const points = [0, 2, 4, 6].map(i => ({ x: values[i]!, y: values[i + 1]! }));
+      expect(values).toHaveLength(12);
+      const points = [0, 2, 4, 6, 8, 10].map(i => ({ x: values[i]!, y: values[i + 1]! }));
       // An ordered control polygon keeps the cubic monotone on both axes.
       for (const axis of ['x', 'y'] as const) {
-        const sign = points[3]![axis] >= points[0]![axis] ? 1 : -1;
-        for (let i = 1; i < 4; i++) expect((points[i]![axis] - points[i - 1]![axis]) * sign).toBeGreaterThanOrEqual(-.00001);
+        const sign = points[5]![axis] >= points[0]![axis] ? 1 : -1;
+        for (let i = 1; i < 6; i++) expect((points[i]![axis] - points[i - 1]![axis]) * sign).toBeGreaterThanOrEqual(-.00001);
       }
     }
   }

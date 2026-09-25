@@ -25,14 +25,23 @@ function facingPorts(a: Box, b: Box, paddingA: number, paddingB: number, lane = 
     { x: pb, y: b.y - sign * b.height / 2, nx: 0, ny: -sign },
   ];
 }
-function span(a: Port, b: Port, startGap: number, endGap: number): string {
+function span(a: Port, b: Port, startGap: number, endGap: number, arrow = false): { shaft: string; head: string } {
   const start = { x: a.x + a.nx * startGap, y: a.y + a.ny * startGap };
-  const end = { x: b.x + b.nx * endGap, y: b.y + b.ny * endGap };
-  // Control points stay ordered along the separating axis. No minimum handle length:
-  // a tiny gap must never produce a backwards hook or an overshooting S-curve.
-  const forward = (end.x - start.x) * a.nx + (end.y - start.y) * a.ny;
-  const handle = Math.min(90, Math.max(0, forward) * .45);
-  return `M${start.x},${start.y} C${start.x + a.nx * handle},${start.y + a.ny * handle} ${end.x + b.nx * handle},${end.y + b.ny * handle} ${end.x},${end.y}`;
+  const tip = { x: b.x + b.nx * endGap, y: b.y + b.ny * endGap };
+  const forward = Math.max(0, (tip.x - start.x) * a.nx + (tip.y - start.y) * a.ny);
+  const headLength = arrow ? Math.min(8, forward * .4) : 0;
+  const end = { x: tip.x + b.nx * headLength, y: tip.y + b.ny * headLength };
+  // Reserve straight, tangent-aligned joins at the necks and before the arrowhead.
+  // The shaft stops at the head's base: a curved shaft cannot poke out of its sides.
+  const join = Math.min(4, (forward - headLength) * .15);
+  const first = { x: start.x + a.nx * join, y: start.y + a.ny * join };
+  const last = { x: end.x + b.nx * join, y: end.y + b.ny * join };
+  const handle = Math.min(90, Math.max(0, forward - headLength - 2 * join) * .45);
+  const halfWidth = headLength * .42;
+  return {
+    shaft: `M${start.x},${start.y} L${first.x},${first.y} C${first.x + a.nx * handle},${first.y + a.ny * handle} ${last.x + b.nx * handle},${last.y + b.ny * handle} ${last.x},${last.y} L${end.x},${end.y}`,
+    head: arrow ? `M${tip.x},${tip.y} L${end.x - b.ny * halfWidth},${end.y + b.nx * halfWidth} L${end.x + b.ny * halfWidth},${end.y - b.nx * halfWidth} Z` : '',
+  };
 }
 
 const neckLength = 10;
@@ -63,7 +72,7 @@ function labelOutline(box: Box, ports: Port[]): string {
 }
 
 /** Demo renderer geometry, not a general obstacle router. */
-export function edgeRoute(source: Box, target: Box, label: Box, loop: boolean): { before: string; after: string; surface: string } {
+export function edgeRoute(source: Box, target: Box, label: Box, loop: boolean): { before: string; after: string; surface: string; arrow: string } {
   const [departure, entry] = facingPorts(source, label, 20, 14, loop ? -.65 : 0);
   const [exit, arrival] = facingPorts(label, target, 14, 20, loop ? .65 : 0);
   if (entry.nx === exit.nx && entry.ny === exit.ny) {
@@ -88,9 +97,12 @@ export function edgeRoute(source: Box, target: Box, label: Box, loop: boolean): 
     departure[axis] = middle - sign * spread;
     arrival[axis] = middle + sign * spread;
   }
+  const incoming = span(departure, entry, 1.5, neckLength);
+  const outgoing = span(exit, arrival, neckLength, 2.5, true);
   return {
-    before: span(departure, entry, 1.5, neckLength),
-    after: span(exit, arrival, neckLength, 2.5),
+    before: incoming.shaft,
+    after: outgoing.shaft,
+    arrow: outgoing.head,
     surface: labelOutline(label, [entry, exit]),
   };
 }

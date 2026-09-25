@@ -87,6 +87,7 @@ test('Topic explains outgoing-only view, reveals incoming, and arrow tips stay c
   const checkArrowGeometry = async () => {
     const routes = await page.locator('[data-edge]').evaluateAll(groups => groups.map(group => {
       const path = group.querySelector('.edge-target') as SVGPathElement;
+      const head = group.querySelector('.edge-arrow') as SVGPathElement;
       const rect = document.querySelector(`[data-node="${group.getAttribute('data-target')}"] rect`) as SVGRectElement;
       const surface = document.querySelector(`[data-label="${group.getAttribute('data-edge')}"] .edge-surface`) as SVGPathElement;
       const incoming = group.querySelector('.edge-path') as SVGPathElement;
@@ -98,20 +99,26 @@ test('Topic explains outgoing-only view, reveals incoming, and arrow tips stay c
       const joined = touchesSurface(incoming, incoming.getTotalLength()) && touchesSurface(path, 0);
       const size = rect.getBBox();
       const length = path.getTotalLength();
-      const local = (distance: number) => {
-        const p = path.getPointAtLength(distance);
-        return new DOMPoint(p.x, p.y).matrixTransform(path.getCTM()!).matrixTransform(rect.getCTM()!.inverse());
+      const local = (line: SVGPathElement, distance: number) => {
+        const p = line.getPointAtLength(distance);
+        return new DOMPoint(p.x, p.y).matrixTransform(line.getCTM()!).matrixTransform(rect.getCTM()!.inverse());
       };
-      const end = local(length), before = local(Math.max(0, length - 1));
+      const end = local(head, 0), base = local(path, length), before = local(path, Math.max(0, length - 1));
+      const dx = end.x - base.x, dy = end.y - base.y;
+      const tangentError = Math.abs(dx * (base.y - before.y) - dy * (base.x - before.x));
+      const headPoints = head.getAttribute('d')!.match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi)!.map(Number);
+      const shaftEnd = path.getPointAtLength(length);
+      const baseError = Math.hypot(shaftEnd.x - (headPoints[2]! + headPoints[4]!) / 2, shaftEnd.y - (headPoints[3]! + headPoints[5]!) / 2);
       const distance = (p: DOMPoint) => Math.hypot(Math.max(size.x - p.x, 0, p.x - size.x - size.width), Math.max(size.y - p.y, 0, p.y - size.y - size.height));
-      return { id: group.getAttribute('data-edge'), joined, gap: distance(end), approachGap: distance(before), marker: path.getAttribute('marker-end') };
+      return { id: group.getAttribute('data-edge'), joined, gap: distance(end), approachGap: distance(base), tangentError, baseError };
     }));
     expect(routes.length).toBeGreaterThan(0);
     for (const route of routes) {
       expect(route.joined, `${route.id} line must meet both label necks`).toBe(true);
       expect(route.gap, `${route.id} tip clearance`).toBeCloseTo(2.5, 1);
       expect(route.approachGap, `${route.id} must approach from outside`).toBeGreaterThan(route.gap);
-      expect(route.marker).toMatch(/^url\(#arrow-/);
+      expect(route.baseError, `${route.id} shaft ends at arrow base`).toBeLessThan(.001);
+      expect(route.tangentError, `${route.id} straight approach into arrowhead`).toBeLessThan(.01);
     }
   };
   await checkArrowGeometry();
