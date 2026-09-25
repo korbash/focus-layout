@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Focus Layout · Graph explorer</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header class="top"><a class="brand" href="/" aria-label="Focus Layout home"><span class="mark">⌘</span> focus<span class="light">layout</span></a><span class="tag">INTERACTIVE PLAYGROUND</span><a href="https://github.com/korbash/focus-layout" target="_blank" rel="noreferrer">Source ↗</a></header>
+<main>
+<aside class="sidebar">
+  <div class="eyebrow">A MAP YOU CAN EXPLORE</div><h1>Follow your<br>curiosity.</h1><p class="intro">Pick a node. Its neighbourhood comes into focus, one connection at a time.</p>
+  <label class="control">Jump to a node<select id="jump" aria-label="Jump to a node"></select></label>
+  <section><div class="section-title">VISIBLE CONNECTIONS <span id="file-count">3 files</span></div><div id="files"></div></section>
+  <section><div class="section-title">NEIGHBOURHOOD</div><div class="control">Steps from focus<div class="segmented" id="depth" role="group" aria-label="Steps from focus"><button data-depth="1">1</button><button data-depth="2" class="selected">2</button><button data-depth="3">3</button></div></div>
+  <label class="control">Follow connections<select id="direction"><option value="out">Outgoing →</option><option value="in">← Incoming</option><option value="both">Both directions ↔</option></select></label>
+  <label class="control">Arrangement<select id="flow"><option value="free">Organic</option><option value="horizontal">Left to right</option><option value="vertical">Top to bottom</option></select></label></section>
+  <div class="library-note"><span class="status-dot"></span> Your renderer. Our coordinates.<small>WebCola handles the mathematics.<br>Focus Layout handles the journey.</small></div>
+</aside>
+<section class="stage" aria-label="Interactive graph">
+  <div class="stage-header"><div class="breadcrumbs">Example workspace <span>/</span> <strong id="focus-name">Document</strong></div><button id="back" disabled>← Back</button></div>
+  <svg id="graph" role="group" aria-label="Relationship graph" tabindex="0"><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L8,4 L0,8" fill="#819493"/></marker></defs><g id="world"><g id="edges"></g><g id="labels"></g><g id="nodes"></g></g></svg>
+  <div class="canvas-help">Click a node to refocus <span>·</span> Click a connection to inspect <span>·</span> Drag background to pan</div>
+  <div class="canvas-footer"><span id="stats" role="status">Preparing graph…</span><div class="zoom"><button id="zoom-out" aria-label="Zoom out">−</button><button id="fit">Fit</button><button id="zoom-in" aria-label="Zoom in">+</button></div></div>
+  <div id="error" role="alert" hidden></div>
+</section>
+<aside class="inspector"><div class="eyebrow" id="detail-kind">IN FOCUS</div><div class="detail-icon" id="detail-icon">D</div><h2 id="detail-title">Document</h2><p id="detail-description"></p><dl><dt>Defined in</dt><dd id="detail-file"></dd><dt id="detail-type-label">Connections</dt><dd id="detail-type"></dd></dl><div class="inspector-divider"></div><div class="section-title">HOW THIS WORKS</div><p class="explanation">Nodes and edge labels have real dimensions. The layout makes room for both.</p><p class="explanation">Click again during a transition. The next journey starts exactly where you are.</p><pre><code id="api-call">explorer.focus('document')</code></pre><span class="local-badge">LOCAL · NO ACCOUNT · MIT</span></aside>
+</main><script type="module" src="/main.ts"></script></body></html>
