@@ -84,6 +84,9 @@ Short straight joins connect the curves to the label necks and arrowheads. Arrow
 filled triangles; shafts end at their bases instead of continuing beneath them.
 Facing ports are selected together from the free space between boxes; curve handles shrink with
 that space so short links don't double back. This is local routing, not obstacle avoidance.
+All edges in a frame share a port allocation pass: incoming and outgoing connections repel along
+each node side, with two slots for self-loops. Ports retain their geometric order and aim for a
+16-unit separation; overcrowded sides compress that spacing to stay clear of rounded corners.
 The playground measures SVG text after fonts load and passes the resulting card sizes to the solver.
 Short labels shrink to their content; selected metrics include wrapped descriptions to demonstrate
 different heights. The demo uses a 40-unit card gap, leaving room for the tapered label ends.

@@ -1,4 +1,4 @@
-import type { Point, Size } from '../src/types';
+import type { Point, Size, PositionedNode, PositionedEdge } from '../src/types';
 
 type Box = Point & Size;
 type Port = Point & { nx: number; ny: number };
@@ -71,8 +71,7 @@ function labelOutline(box: Box, ports: Port[]): string {
   return d + ' Z';
 }
 
-/** Demo renderer geometry, not a general obstacle router. */
-export function edgeRoute(source: Box, target: Box, label: Box, loop: boolean): { before: string; after: string; surface: string; arrow: string } {
+function edgePorts(source: Box, target: Box, label: Box, loop: boolean) {
   const [departure, entry] = facingPorts(source, label, 20, 14, loop ? -.65 : 0);
   const [exit, arrival] = facingPorts(label, target, 14, 20, loop ? .65 : 0);
   if (entry.nx === exit.nx && entry.ny === exit.ny) {
@@ -97,6 +96,10 @@ export function edgeRoute(source: Box, target: Box, label: Box, loop: boolean): 
     departure[axis] = middle - sign * spread;
     arrival[axis] = middle + sign * spread;
   }
+  return { departure, entry, exit, arrival };
+}
+
+function renderRoute({ departure, entry, exit, arrival }: ReturnType<typeof edgePorts>, label: Box) {
   const incoming = span(departure, entry, 1.5, neckLength);
   const outgoing = span(exit, arrival, neckLength, 2.5, true);
   return {
@@ -105,4 +108,59 @@ export function edgeRoute(source: Box, target: Box, label: Box, loop: boolean): 
     arrow: outgoing.head,
     surface: labelOutline(label, [entry, exit]),
   };
+}
+
+/** Demo renderer geometry, not a general obstacle router. */
+export function edgeRoute(source: Box, target: Box, label: Box, loop: boolean) {
+  return renderRoute(edgePorts(source, target, label, loop), label);
+}
+
+type Attachment = { id: string; port: Port; opposite: Port };
+
+// Separate all incoming AND outgoing attachments on each flat side. The ordered
+// least-squares projection moves crowded ports together, avoiding an arbitrary bias
+// towards either end of the side. Stable geometric ordering prevents local crossings.
+function spreadPorts(box: Box, attachments: Attachment[]) {
+  if (attachments.length < 2) return;
+  const axis = attachments[0]!.port.nx ? 'y' : 'x';
+  const half = Math.max(0, (axis === 'x' ? box.width : box.height) / 2 - 20);
+  const low = box[axis] - half, high = box[axis] + half;
+  attachments.sort((a, b) => a.opposite[axis] - b.opposite[axis] || a.port[axis] - b.port[axis] || a.id.localeCompare(b.id));
+  const gap = Math.min(16, (high - low) / (attachments.length - 1));
+  const upper = high - gap * (attachments.length - 1);
+  const blocks: { start: number; count: number; sum: number }[] = [];
+  for (const [i, attachment] of attachments.entries()) {
+    blocks.push({ start: i, count: 1, sum: attachment.port[axis] - i * gap });
+    while (blocks.length > 1) {
+      const right = blocks[blocks.length - 1]!, left = blocks[blocks.length - 2]!;
+      if (left.sum / left.count <= right.sum / right.count) break;
+      blocks.pop(); left.sum += right.sum; left.count += right.count;
+    }
+  }
+  for (const block of blocks) {
+    const value = clamp(block.sum / block.count, low, upper);
+    for (let i = block.start; i < block.start + block.count; i++) attachments[i]!.port[axis] = value + i * gap;
+  }
+}
+
+/** Plan a frame together so independent edges cannot claim the same node port. */
+export function routeEdges(nodes: readonly PositionedNode[], edges: readonly PositionedEdge[]) {
+  const byId = new Map(nodes.map(node => [node.id, node]));
+  const sides = new Map<string, { box: Box; attachments: Attachment[] }>();
+  function attach(nodeId: string, id: string, port: Port, opposite: Port) {
+    const key = JSON.stringify([nodeId, port.nx, port.ny]);
+    let side = sides.get(key);
+    if (!side) { side = { box: byId.get(nodeId)!, attachments: [] }; sides.set(key, side); }
+    side.attachments.push({ id, port, opposite });
+  }
+  const plans = edges.map(edge => {
+    const source = byId.get(edge.source)!, target = byId.get(edge.target)!;
+    const label = { ...(edge.labelPosition || { x: (source.x + target.x) / 2, y: (source.y + target.y) / 2 }), ...(edge.label || { width: 44, height: 44 }) };
+    const ports = edgePorts(source, target, label, edge.source === edge.target);
+    attach(edge.source, `${edge.id}:source`, ports.departure, ports.entry);
+    attach(edge.target, `${edge.id}:target`, ports.arrival, ports.exit);
+    return { id: edge.id, label, ports };
+  });
+  for (const side of sides.values()) spreadPorts(side.box, side.attachments);
+  return new Map(plans.map(plan => [plan.id, renderRoute(plan.ports, plan.label)]));
 }

@@ -1,5 +1,5 @@
 import { measureCard, type Card } from './cards';
-import { edgeRoute } from './routing';
+import { routeEdges } from './routing';
 import { createExplorer, type Frame, type Graph, type LayoutOptions } from '../src/index';
 
 const nodeInfo: Record<string, { name: string; file: string; description: string }> = {
@@ -99,6 +99,7 @@ function draw(next: Frame) {
     el.setAttribute('transform', `translate(${n.x},${n.y})`); el.setAttribute('opacity', String(n.opacity));
     (el as SVGElement).style.pointerEvents = n.opacity < .1 ? 'none' : 'auto';
   }
+  const routes = routeEdges(next.nodes, next.edges);
   for (const e of next.edges) {
     const a = byId.get(e.source)!, b = byId.get(e.target)!;
     const label = e.labelPosition || { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
@@ -111,7 +112,7 @@ function draw(next: Frame) {
       path.append(element('path', { class: 'edge-arrow', fill: colors[info[3]]! }));
       document.getElementById('edges')!.append(path); edgeElements.set(e.id, path);
     }
-    const route = edgeRoute(a, b, { ...label, ...(e.label || { width: 1, height: 1 }) }, e.source === e.target);
+    const route = routes.get(e.id)!;
     path.children[0]!.setAttribute('d', route.before);
     path.children[1]!.setAttribute('d', route.after);
     path.children[2]!.setAttribute('d', route.arrow);

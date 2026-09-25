@@ -1,5 +1,35 @@
 import { test, expect } from '@playwright/test';
-import { edgeRoute } from '../demo/routing';
+import { edgeRoute, routeEdges } from '../demo/routing';
+import type { PositionedNode, PositionedEdge } from '../src/types';
+
+test('incoming, outgoing and loop ports repel together, with stable ordering and bounded crowded sides', () => {
+  const nodes: PositionedNode[] = [
+    { id: 'hub', x: 0, y: 0, width: 160, height: 80, opacity: 1 },
+    ...[-30, 0, 30].map((x, i) => ({ id: `n${i}`, x, y: 350, width: 100, height: 60, opacity: 1 })),
+  ];
+  const edges: PositionedEdge[] = [-12, 0, 12].map((x, i) => ({
+    id: `e${i}`, source: i === 1 ? `n${i}` : 'hub', target: i === 1 ? 'hub' : `n${i}`,
+    label: { width: 100, height: 44 }, labelPosition: { x, y: 160 }, opacity: 1,
+  }));
+  edges.push({ id: 'loop', source: 'hub', target: 'hub', label: { width: 100, height: 44 }, labelPosition: { x: 18, y: 130 }, opacity: 1 });
+  for (const width of [160, 64]) {
+    nodes[0]!.width = width;
+    const routes = routeEdges(nodes, edges);
+    const reverse = routeEdges([...nodes].reverse(), [...edges].reverse());
+    const ports: number[] = [];
+    const firstX = (path: string) => Number(path.match(/^M([^,]+)/)![1]);
+    for (const edge of edges) {
+      const route = routes.get(edge.id)!;
+      expect(route).toEqual(reverse.get(edge.id));
+      if (edge.source === 'hub') ports.push(firstX(route.before));
+      if (edge.target === 'hub') ports.push(firstX(route.arrow));
+    }
+    ports.sort((a, b) => a - b);
+    expect(ports).toHaveLength(5); // The self-loop occupies two distinct slots.
+    for (const x of ports) expect(Math.abs(x)).toBeLessThanOrEqual(width / 2 - 20 + .001);
+    for (let i = 1; i < ports.length; i++) expect(ports[i]! - ports[i - 1]!).toBeGreaterThanOrEqual(Math.min(16, (width - 40) / 4) - .001);
+  }
+});
 
 test('short links and differently proportioned cards never fold back between their ports', () => {
   const cases = [
